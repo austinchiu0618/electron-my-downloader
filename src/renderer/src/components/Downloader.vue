@@ -1,78 +1,47 @@
 <script setup lang="ts">
-import streamSaver from 'streamsaver'
+// import streamSaver from 'streamsaver'
 
 const props = defineProps<{
   videoUrl?: string
+  title: string
+  isStreamSaver: boolean
 }>()
 
-const inputEl = ref<HTMLInputElement>()
+const isPause = defineModel<boolean>('isPause')
+
 const emit = defineEmits(['cancel'])
+// const { isPause: pause } = useVModels(props, emit)
 
 const options = reactive({
-  title: '',
-  isPause: false,
-  isStreamSaver: true,
+  title: props.title,
+  isStreamSaver: props.isStreamSaver,
   streamWriter: null
 })
 
-const modalShow = reactive({
-  title: false,
-  cancel: false
-})
-
-const pauseButton = computed(() => (options.isPause ? '繼續' : '暫停'))
-const state = computed(() => (options.isPause ? '暫停中' : '下載中'))
-
-function start() {
-  console.log(options.isStreamSaver)
-  if (!options.title) {
-    options.title = useDateFormat(useNow(), 'YYYYMMDDHHmmss').value
-  }
-}
+const pauseButton = computed(() => (isPause.value ? '繼續' : '暫停'))
+const state = computed(() => (isPause.value ? '暫停中' : '下載中'))
 
 function cancel() {
   emit('cancel')
 }
 
-watch(
-  () => props.videoUrl,
-  (newValue, oldValue) => {
-    if (!newValue || newValue === oldValue) return
-    console.log('watch videoUrl')
-  }
-)
-
-onBeforeMount(() => {
-  modalShow.title = true
-  if (inputEl) {
-    setTimeout(() => {
-      inputEl.value?.focus()
-    }, 0)
-  }
-})
+// onMounted(() => {
+// })
 </script>
 
 <template>
-  <div>
-    <div class="flex items-center space-x-12">
-      <p class="text-[white] text-lg">檔名：{{ options.title }}</p>
-      <p class="text-[white] text-lg">狀態：{{ state }}</p>
-      <div class="flex space-x-2">
-        <a-button type="secondary" @click="options.isPause = !options.isPause">{{ pauseButton }}</a-button>
-        <a-popconfirm :ok-button-props="{ status: 'danger' }" content="確定是否取消？?" type="error" @ok="cancel">
-          <a-button type="primary" status="danger" @click="modalShow.cancel = true">取消</a-button>
-        </a-popconfirm>
+  <div class="min-h-[74vh] p-4 bg-[#111111bb] flex flex-col space-y-3 text-base">
+    <div class="flex items-center space-x-10">
+      <p class="text-[white]">檔名：{{ options.title }}</p>
+      <p class="text-[white]">狀態：{{ state }}</p>
+      <div class="flex space-x-3">
+        <a-button size="small" type="secondary" @click="isPause = !isPause">{{ pauseButton }}</a-button>
+        <a-button size="small" type="primary" status="warning" @click="cancel()">取消</a-button>
       </div>
     </div>
-  </div>
 
-  <a-modal v-model:visible="modalShow.title" title="影片名稱" @cancel="cancel" @ok="start">
-    <a-space direction="vertical" size="medium" fill>
-      <a-input ref="inputEl" v-model="options.title" />
-      <div class="flex items-center space-x-3">
-        <a-switch v-model="options.isStreamSaver" :checked-value="true" />
-        <span>使用StreamSaver</span>
-      </div>
-    </a-space>
-  </a-modal>
+    <div class="text-[white] flex items-center">網址：{{ videoUrl }} <CopyButton :text="videoUrl ?? ''" /></div>
+
+    <div></div>
+  </div>
 </template>

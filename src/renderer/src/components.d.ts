@@ -9,12 +9,18 @@ declare module 'vue' {
   export interface GlobalComponents {
     AButton: typeof import('@arco-design/web-vue')['Button']
     ADivider: typeof import('@arco-design/web-vue')['Divider']
+    ADoption: typeof import('@arco-design/web-vue')['Doption']
+    ADropdown: typeof import('@arco-design/web-vue')['Dropdown']
     AInput: typeof import('@arco-design/web-vue')['Input']
     AInputSearch: typeof import('@arco-design/web-vue')['InputSearch']
     AModal: typeof import('@arco-design/web-vue')['Modal']
     APopconfirm: typeof import('@arco-design/web-vue')['Popconfirm']
     ASpace: typeof import('@arco-design/web-vue')['Space']
     ASwitch: typeof import('@arco-design/web-vue')['Switch']
+    ATabPane: typeof import('@arco-design/web-vue')['TabPane']
+    ATabs: typeof import('@arco-design/web-vue')['Tabs']
+    AUpload: typeof import('@arco-design/web-vue')['Upload']
+    CopyButton: typeof import('./components/CopyButton.vue')['default']
     Downloader: typeof import('./components/Downloader.vue')['default']
     VideoPlayer: typeof import('./components/VideoPlayer.vue')['default']
   }

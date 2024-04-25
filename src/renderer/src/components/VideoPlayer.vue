@@ -20,11 +20,15 @@ const plyrOptions = {
 }
 
 const setVideoUrl = (url: string) => {
-  if (!videoEl.value) return
-  if (!url?.endsWith('m3u8')) {
-    videoEl.value.src = url
-  } else {
+  if (videoEl.value && Hls.isSupported()) {
     const hls = new Hls()
+    hls.on(Hls.Events.ERROR, function (event, data) {
+      // console.error('HLS error:', data.type, data.details)
+      if (data.details === 'manifestLoadError') {
+        emit('error')
+      }
+      console.error('HLS error:', data.type, data.details)
+    })
     hls.loadSource(url)
     hls.attachMedia(videoEl.value)
   }
@@ -46,7 +50,7 @@ onMounted(() => {
     })
     videoPlayer.on('error', () => {
       emit('error')
-      console.log('error')
+      console.log('VideoPlayer Error')
     })
     if (props.videoUrl) {
       setVideoUrl(props.videoUrl)
