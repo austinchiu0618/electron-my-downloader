@@ -27,7 +27,7 @@ const setVideoUrl = (url: string) => {
       if (data.details === 'manifestLoadError') {
         emit('error')
       }
-      console.error('HLS error:', data.type, data.details)
+      console.error('HLS Error： ', data.type, data.details)
     })
     hls.loadSource(url)
     hls.attachMedia(videoEl.value)
@@ -48,9 +48,9 @@ onMounted(() => {
     videoPlayer.on('loadedmetadata', () => {
       videoPlayer.play()
     })
-    videoPlayer.on('error', () => {
+    videoPlayer.on('error', (err) => {
       emit('error')
-      console.log('VideoPlayer Error')
+      console.error('VideoPlayer Error： ', err)
     })
     if (props.videoUrl) {
       setVideoUrl(props.videoUrl)

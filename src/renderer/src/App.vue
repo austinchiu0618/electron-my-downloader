@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // const ipcHandle = () => window.electron.ipcRenderer.send('ping')
-import { IconCloseCircle, IconPlayArrowFill, IconDownload, IconUpload } from '@arco-design/web-vue/es/icon'
+import { IconDelete, IconPaste, IconPlayArrowFill, IconDownload, IconUpload } from '@arco-design/web-vue/es/icon'
 
-import type { Tab } from '@renderer/types'
+import { Status, downloadStateText, DownloadState, type Tab } from '@renderer/types'
 import type { FileItem } from '@arco-design/web-vue/es'
 
 const VideoPlayer = defineAsyncComponent(() => import('@renderer/components/VideoPlayer.vue'))
@@ -30,11 +30,6 @@ const urlHistory = reactive({
   }
 })
 
-enum Status {
-  normal,
-  invalidUrl,
-  playError
-}
 const videoStatus = ref(Status.normal)
 const errorMessage = computed(() => {
   switch (videoStatus.value) {
@@ -47,16 +42,16 @@ const errorMessage = computed(() => {
   }
 })
 
-function validUrl() {
-  const isEmpty = !inputUrl.value
-  const isWrongUrl = !(inputUrl.value.startsWith('http') || inputUrl.value.startsWith('blob'))
+function validUrl(url: string) {
+  const isEmpty = !url
+  const isWrongUrl = !(url.startsWith('http') || url.startsWith('blob'))
   videoStatus.value = isEmpty || isWrongUrl ? Status.invalidUrl : Status.normal
   return !(isEmpty || isWrongUrl)
 }
 
 const playVideo = reactive({
-  playButton(url = inputUrl.value) {
-    if (!validUrl()) return
+  start(url = inputUrl.value) {
+    if (!validUrl(url)) return
     if (tabList.length === 0 || tabList[0].key !== 'video') {
       tabList.unshift({
         key: 'video',
@@ -92,31 +87,28 @@ const playVideo = reactive({
         }
       }
     }
-  },
-  historyUrlSelect(url) {
-    playVideo.playButton(url)
   }
 })
 
 const initDownloadOption = {
   title: '',
-  isPause: false,
-  isStreamSaver: true
+  isStart: false,
+  isUseStreamSaver: true
 }
 
 const downloadVideo = reactive({
   showStartModal: false,
   options: {
     title: '',
-    isPause: false,
-    isStreamSaver: true
+    isStart: false,
+    isUseStreamSaver: true
   },
-  downloadButton() {
-    if (!validUrl()) return
+  openDownloadOption() {
+    if (!validUrl(inputUrl.value)) return
     if (!downloadVideo.options.title) downloadVideo.options.title = useDateFormat(useNow(), 'YYYYMMDDHHmmss').value
     downloadVideo.showStartModal = true
   },
-  startDownload() {
+  start() {
     const timestamp = useDateFormat(useNow(), 'YYYYMMDDHHmmss').value
     if (!downloadVideo.options.title) downloadVideo.options.title = timestamp
     tabList.push({
@@ -126,15 +118,16 @@ const downloadVideo = reactive({
       props: {
         videoUrl: inputUrl.value,
         title: downloadVideo.options.title,
-        isStreamSaver: downloadVideo.options.isStreamSaver
+        isStart: downloadVideo.options.isStart,
+        isUseStreamSaver: downloadVideo.options.isUseStreamSaver
+      },
+      model: {
+        state: downloadVideo.options.isStart ? DownloadState.downloading : DownloadState.ready
       },
       event: {
         cancel() {
-          downloadVideo.cancelDownload(timestamp)
+          downloadVideo.cancel(timestamp)
         }
-      },
-      model: {
-        isPause: downloadVideo.options.isPause
       }
     })
     activeTab.value = timestamp
@@ -142,7 +135,7 @@ const downloadVideo = reactive({
   optionsInit() {
     downloadVideo.options = { ...initDownloadOption, title: useDateFormat(useNow(), 'YYYYMMDDHHmmss').value }
   },
-  cancelDownload(key: string) {
+  cancel(key: string) {
     warningModal({
       content: '是否取消下載',
       onOk() {
@@ -155,10 +148,11 @@ const downloadVideo = reactive({
 })
 
 function uploadFile(fileList: FileItem[], fileItem: FileItem) {
+  if (fileList.length > 1) fileList.shift()
   if (fileItem.file) {
     const videoUrl = URL.createObjectURL(fileItem.file)
     downloadVideo.options.title = fileItem.file.name
-    playVideo.playButton(videoUrl)
+    playVideo.start(videoUrl)
   }
 }
 
@@ -172,24 +166,31 @@ const deleteTab = (key) => {
     tabList.shift()
     if (tabList.length > 0) activeTab.value = tabList[0].key
   } else {
-    downloadVideo.cancelDownload(key)
+    downloadVideo.cancel(key)
   }
+}
+
+const pasteText = () => {
+  navigator.clipboard.readText().then((text) => {
+    inputUrl.value = text
+  })
 }
 </script>
 
 <template>
   <div class="app w-screen h-screen overflow-auto">
     <div class="py-8 flex flex-col w-[93vw] mx-auto">
-      <!--  -->
-      <div class="mb-5">
-        <div class="mb-3 flex items-center space-x-2">
+      <div class="mb-5 flex flex-col space-y-1.5">
+        <div class="flex items-center space-x-2">
           <a-input v-model:model-value="inputUrl" focus :error="videoStatus === Status.invalidUrl">
-            <template v-if="inputUrl" #suffix>
-              <button @click="inputUrl = ''"><IconCloseCircle class="!text-[22px] !text-[#aaa]" /></button>
+            <template #suffix>
+              <button v-if="inputUrl" @click="inputUrl = ''"><IconDelete class="!text-lg !text-[#aaa]" /></button>
+              <button v-else @click="pasteText"><IconPaste class="!text-lg !text-[#aaa]" /></button>
             </template>
+
             <template #prepend>
-              <a-dropdown position="bl" update-at-scroll @select="playVideo.playButton">
-                <a-button size="mini">歷史紀錄</a-button>
+              <a-dropdown position="bl" update-at-scroll @select="playVideo.start">
+                <a-button size="mini">觀看紀錄</a-button>
                 <template #content>
                   <div class="min-w-[60.5vw]">
                     <a-doption v-for="url in urlHistory.list" :key="url" :value="url">{{ url }}</a-doption>
@@ -200,60 +201,59 @@ const deleteTab = (key) => {
             </template>
           </a-input>
 
-          <a-button type="secondary" @click="playVideo.playButton()">
+          <a-button type="secondary" @click="playVideo.start()">
             <IconPlayArrowFill class="text-base" />
             線上觀看
           </a-button>
 
-          <a-button type="primary" @click="downloadVideo.downloadButton">
+          <a-button type="primary" @click="downloadVideo.openDownloadOption">
             <IconDownload class="text-base" />
             下載影片
           </a-button>
 
           <a-upload :auto-upload="false" :show-file-list="false" @change="uploadFile">
             <template #upload-button>
-              <a-button status="success"> <IconUpload />本機m3u8 </a-button>
+              <a-button status="success"> <IconUpload />本機m3u8</a-button>
             </template>
           </a-upload>
         </div>
 
-        <div class="text-base">
-          <p v-if="videoStatus !== 0" class="text-[#fe4747] font-bold">Error：{{ errorMessage }}</p>
-          <div v-else-if="tabList[0] && tabList[0].key === 'video'" class="text-[#fff] flex items-center">
-            目前播放網址：{{ tabList[0].props.videoUrl }}
-            <CopyButton :text="tabList[0].props.videoUrl" />
-          </div>
-        </div>
+        <p v-if="videoStatus !== 0" class="text-[#fe4747] font-bold text-base">Error：{{ errorMessage }}</p>
+
+        <p v-if="tabList[0] && tabList[0].key === 'video'" class="text-[#fff] text-base flex items-center">
+          目前播放網址：{{ tabList[0].props.videoUrl }}
+          <CopyButton :text="tabList[0].props.videoUrl" />
+        </p>
       </div>
 
       <!-- Tabs -->
       <div v-if="tabList.length > 0" class="tabs">
         <a-tabs type="card" :active-key="activeTab" auto-switch :editable="true" @delete="deleteTab" @tab-click="clickTab">
           <a-tab-pane v-for="tab of tabList" :key="tab.key" :title="tab.title">
-            <template v-if="'isPause' in tab.model" #title>{{ tab.title }} - {{ tab.model.isPause ? '暫停中' : '下載中' }}</template>
-            <component :is="tab.component" v-bind="tab.props" v-model:isPause="tab.model.isPause" v-on="tab.event"></component>
+            <template v-if="'state' in tab.model" #title>{{ tab.title }} - {{ downloadStateText(tab.model.state) }}</template>
+            <component :is="tab.component" v-bind="tab.props" v-model:state="tab.model.state" v-on="tab.event"></component>
           </a-tab-pane>
         </a-tabs>
       </div>
 
       <!-- 設定影片Modal -->
-      <a-modal v-model:visible="downloadVideo.showStartModal" title="設定影片" @ok="downloadVideo.startDownload">
+      <a-modal v-model:visible="downloadVideo.showStartModal" title="設定影片" @ok="downloadVideo.start">
         <a-space direction="vertical" size="medium" fill>
           <a-input ref="inputEl" v-model="downloadVideo.options.title">
             <template v-if="downloadVideo.options.title !== ''" #suffix>
               <button @click="downloadVideo.options.title = ''">
-                <IconCloseCircle class="!text-[22px] !text-[#aaa]" />
+                <IconDelete class="!text-lg !text-[#aaa]" />
               </button>
             </template>
           </a-input>
           <div class="flex items-center justify-start space-x-4">
             <div class="flex items-center space-x-2">
-              <a-switch v-model="downloadVideo.options.isStreamSaver" :checked-value="true" />
+              <a-switch v-model="downloadVideo.options.isUseStreamSaver" :checked-value="true" />
               <span>使用StreamSaver</span>
             </div>
             <div class="flex items-center space-x-2">
-              <a-switch v-model="downloadVideo.options.isPause" />
-              <span>立即下載</span>
+              <a-switch v-model="downloadVideo.options.isStart" />
+              <span>開始下載</span>
             </div>
             <div class="flex-grow text-right">
               <a-button class="justify-items-end" type="text" @click="downloadVideo.optionsInit">初始化設定</a-button>
@@ -263,7 +263,7 @@ const deleteTab = (key) => {
       </a-modal>
 
       <!-- 是否取消下載 -->
-      <!-- <a-modal v-model:visible="downloadVideo.isShowCancelModal" status="danger" simple title="是否取消下載" @ok="downloadVideo.cancelDownloadConfirm" /> -->
+      <!-- <a-modal v-model:visible="downloadVideo.isShowCancelModal" status="danger" simple title="是否取消下載" @ok="downloadVideo.cancelConfirm" /> -->
     </div>
   </div>
 </template>
